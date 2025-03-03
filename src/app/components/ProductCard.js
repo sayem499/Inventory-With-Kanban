@@ -19,7 +19,7 @@ export default function ProductCard({ product, category }) {
       style={style}
       {...attributes}
       {...listeners}
-      className="bg-white p-3 rounded-lg shadow-md border border-gray-300 flex flex-col items-center md:items-start w-full cursor-grab"
+      className="bg-white p-3 rounded-lg shadow-md border border-gray-300 flex flex-col items-center md:items-start w-full cursor-grab touch-none"
     >
       <p className="text-sm font-semibold text-gray-800 text-center md:text-left">
         {product.description}

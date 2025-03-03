@@ -1,11 +1,12 @@
 "use client"
 import { useState, useEffect } from "react";
-import { DndContext, closestCorners } from "@dnd-kit/core";
+import { DndContext, closestCorners, pointerIntersection, rectIntersection } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import dynamic from "next/dynamic";
 import axios from "axios";
 import CategoryColumn from "./components/CategoryColumn";
-import { arrayMove } from "@dnd-kit/sortable";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css"; //
 
 
 const BarcodeScannerComponent = dynamic(() => import("./components/BarcodeScanner"), { ssr: false });
@@ -36,17 +37,36 @@ export default function Home() {
       if (response.data.status) {
         console.log(response.data.product);
         const product = response.data.product;
-        setCategories((prev) => ({
-          ...prev,
-          Uncategorized: [...prev.Uncategorized, product],
-        }));
+        setCategories((prev) => {
+          // ✅ Check if the barcode already exists in any category
+          const alreadyExists = Object.values(prev).some((categoryProducts) =>
+            categoryProducts.some((p) => p.barcode === product.barcode)
+          );
+  
+          if (alreadyExists) {
+            toast.warning("Product already exists in a category!", { autoClose: 2000 });
+            return prev; // Don't update state if product already exists
+          }
+  
+          return {
+            ...prev,
+            Uncategorized: [...prev.Uncategorized, product], // ✅ Add only if not present
+          };
+        });
       }
     } catch (error) {
       console.error("Error fetching product details", error);
     }
   };
 
+  const onDragStart = () => {
+    document.body.style.overflow = "hidden"; // Disable scrolling
+    console.log("Dragstart")
+  };
+
   const onDragEnd = (event) => {
+    document.body.style.overflow = "auto";
+    console.log("Dragend")
     const { active, over } = event;
     if (!over) return;
   
@@ -105,12 +125,12 @@ export default function Home() {
       <button onClick={addCategory} className="mb-4 px-4 py-2 bg-blue-500 text-white rounded-lg">
         Add Category
       </button>
-      <DndContext collisionDetection={closestCorners} onDragEnd={onDragEnd}>
-        {/* ✅ Only categories should be in this SortableContext */}
+      <DndContext collisionDetection={rectIntersection} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        {/* ✅ Only categories should be in this SortableContext  closestCorners*/}
         <SortableContext items={categoryNames}>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {categoryNames.map((category) => (
-              <div key={category} id={`category-${category}`} className="border p-2 rounded-lg">
+              <div data-category={category} key={category} id={`category-${category}`} className="border p-2 rounded-lg">
                 <CategoryColumn category={category} products={categories[category]} />
               </div>
             ))}

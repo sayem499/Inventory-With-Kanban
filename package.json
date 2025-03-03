@@ -16,7 +16,8 @@
     "next-auth": "^4.24.11",
     "react": "^19.0.0",
     "react-barcode-reader": "^0.0.2",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-toastify": "^11.0.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
