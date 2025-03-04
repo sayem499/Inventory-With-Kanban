@@ -58,44 +58,6 @@ export default function Home() {
     }
   };
 
-  /* const fetchProducts = async () => {
-    try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/products/`);
-      if (response.data.status) {
-        const fetchedProducts = response.data.products;
-  
-        setCategories((prev) => {
-          const updatedCategories = { ...prev };
-  
-          // Ensure all category keys exist in the state
-          categoryNames.forEach((category) => {
-            if (!updatedCategories[category]) {
-              updatedCategories[category] = [];
-            }
-          });
-
-          console.log('fetchedProducts',fetchedProducts);
-  
-          // Assign products to their respective categories
-          fetchedProducts.forEach((product) => {
-            const category = product.category_name || "Uncategorized";
-            if (!updatedCategories[category]) {
-              updatedCategories[category] = [];
-            }
-            updatedCategories[category].push(product);
-          });
-          console.log("UpdatedCategories", updatedCategories)
-  
-          return updatedCategories;
-        });
-  
-        console.log("Fetched products and updated categories:", fetchedProducts);
-      }
-    } catch (error) {
-      console.error("Error fetching products:", error);
-      toast.error("Failed to load products!", { autoClose: 2000 });
-    }
-  }; */
   const fetchProducts = async () => {
     try {
       const response = await axios.get(
@@ -108,8 +70,8 @@ export default function Home() {
         const newCategories = {};
 
         fetchedProducts.forEach((product) => {
-          const category = product.category_name || "Uncategorized";
-
+          const category =
+            product.category_id?.category_name || "Uncategorized";
           // Ensure the category exists in the newCategories object
           if (!newCategories[category]) {
             newCategories[category] = [];
@@ -126,6 +88,32 @@ export default function Home() {
       toast.error("Failed to load products!", { autoClose: 2000 });
     }
   };
+
+  const updateProductCategory = async (barcode, newCategory) => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/products/${barcode}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            category_name: newCategory,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to update category: ${response.statusText}`);
+      }
+
+      toast.success(`Product moved to "${newCategory}" successfully!`);
+    } catch (error) {
+      toast.error("Failed to update product category. Please try again.");
+    }
+  };
+
   useEffect(() => {
     console.log("Updated categories:", categories);
   }, [categories]);
@@ -145,13 +133,14 @@ export default function Home() {
   const handleBarcodeScan = async (barcode) => {
     try {
       console.log(barcode);
-      const response = await axios.get(`/api/product/8901012116340`, {
+      const response = await axios.get(`/api/product/${barcode}`, {
+        //8901012116340
         headers: { "Content-Type": "application/json" },
       });
       if (response.data.status) {
-        console.log(response.data.product);
         const product = response.data.product;
         let alreadyExists;
+
         setCategories((prev) => {
           // ✅ Check if the barcode already exists in any category
           alreadyExists = Object.values(prev).some((categoryProducts) =>
@@ -180,7 +169,12 @@ export default function Home() {
         }
       }
     } catch (error) {
-      console.error("Error fetching product details", error);
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        toast.error(`Product with barcode ${barcode} not found!`); // 🚀 Show toast on 404
+      } else {
+        toast.error("Something went wrong. Please try again.");
+      }
+      return null; // ✅ Return null to prevent crashes
     }
   };
 
@@ -210,20 +204,17 @@ export default function Home() {
 
   const onDragStart = () => {
     document.body.style.overflow = "hidden"; // Disable scrolling
-    console.log("Dragstart");
   };
 
-  const onDragEnd = (event) => {
+  const onDragEnd = async (event) => {
+
     document.body.style.overflow = "auto";
-    console.log("Dragend");
     const { active, over } = event;
+    
     if (!over) return;
 
     const fromCategory = active.data.current?.category;
     const toCategory = over.data.current?.category;
-
-    console.log(over);
-    console.log(active);
 
     if (!fromCategory || !toCategory || fromCategory === toCategory) return;
 
@@ -248,9 +239,32 @@ export default function Home() {
     setTimeout(() => {
       setCategories((prev) => ({ ...prev }));
     }, 0);
+
+    // ✅ Call API to persist the update in the backend
+    try {
+
+      await updateProductCategory(barcode, toCategory);
+
+    } catch (error) {
+
+      console.error("Failed to update category:", error);
+      // Rollback in case of an error
+      setCategories((prev) => {
+        const product = prev[toCategory]?.find((p) => p.barcode === barcode);
+        if (!product) return prev;
+
+        return {
+          ...prev,
+          [toCategory]: prev[toCategory].filter((p) => p.barcode !== barcode),
+          [fromCategory]: [...prev[fromCategory], product],
+        };
+      });
+
+    }
   };
 
   const addCategory = async () => {
+
     const newCategory = prompt("Enter category name:");
 
     if (newCategory && !categories[newCategory]) {
@@ -275,8 +289,10 @@ export default function Home() {
           toast.error("Failed to add category!", { autoClose: 2000 });
         }
       } catch (error) {
+
         console.error("Error adding category:", error);
         toast.error("Error adding category!", { autoClose: 2000 });
+
       }
     }
   };
@@ -305,9 +321,6 @@ export default function Home() {
                 id={`category-${category}`}
                 className="border p-2 rounded-lg"
               >
-                {console.log("Categories:", categories)}
-                {console.log("Current Category:", category)}
-                {console.log("Products in Category:", categories[category])}
                 <CategoryColumn
                   category={category}
                   products={categories[category] || []}
